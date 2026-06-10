@@ -7,16 +7,42 @@
 
   // ── State ────────────────────────────────────────────────────────────────
   const state = {
-    pages: [],           // completed virtual pages
-    currentPage: null,   // active virtual page bucket
+    pages: [], // completed virtual pages
+    currentPage: null, // active virtual page bucket
     pageCounter: 0,
     lastNetworkBurst: 0,
     pendingBurstReqs: 0,
     burstTimer: null,
     mutationDebounce: null,
     lastHeading: "",
-    lastContentHash: ""
+    lastContentHash: "",
   };
+
+  // ── Loading-overlay detector — used to avoid snapshotting spinners ───────
+  function loaderVisible() {
+    const sels = [
+      "#loading",
+      ".loading",
+      ".loader",
+      ".spinner",
+      "#pleaseWait",
+      ".blockUI",
+      ".modal-backdrop",
+      ".preloader",
+      "[aria-busy='true']",
+    ];
+    for (const s of sels) {
+      try {
+        const el = document.querySelector(s);
+        if (el && el.offsetParent !== null) return true;
+      } catch (e) {}
+    }
+    const txt = ((document.body && document.body.innerText) || "").slice(
+      0,
+      400,
+    );
+    return /loading\s*\.*\s*please\s*wait/i.test(txt);
+  }
 
   // ── Start first virtual page ─────────────────────────────────────────────
   function startPage(reason, name = null) {
@@ -26,36 +52,48 @@
     const heading = getPageHeading();
     state.currentPage = {
       virtualPageId: state.pageCounter,
-      name:          name || heading || `page-${state.pageCounter}`,
-      detectedBy:    reason,
-      url:           location.href,
-      startTime:     Date.now(),
-      endTime:       null,
-      domSnapshot:   null,
+      name: name || heading || `page-${state.pageCounter}`,
+      detectedBy: reason,
+      url: location.href,
+      startTime: Date.now(),
+      endTime: null,
+      domSnapshot: null,
       interactionLog: [],
-      storageSnapshot: {}
+      storageSnapshot: {},
     };
     state.lastHeading = heading;
     state.lastContentHash = getContentHash();
 
-    // Schedule a DOM snapshot 600ms after detection (content has settled)
-    setTimeout(() => {
-      if (state.currentPage && state.currentPage.virtualPageId === state.pageCounter) {
-        state.currentPage.domSnapshot   = captureDOMSnapshot();
-        state.currentPage.storageSnapshot = captureStorage();
-        // Update name from actual DOM if we had a placeholder
-        if (!name) state.currentPage.name = getPageHeading() || state.currentPage.name;
+    // Schedule a DOM snapshot once content has settled (loaders cleared)
+    const snap = () => {
+      if (
+        !(
+          state.currentPage &&
+          state.currentPage.virtualPageId === state.pageCounter
+        )
+      )
+        return;
+      if (loaderVisible()) {
+        setTimeout(snap, 500);
+        return;
       }
-    }, 600);
+      state.currentPage.domSnapshot = captureDOMSnapshot();
+      state.currentPage.storageSnapshot = captureStorage();
+      // Update name from actual DOM if we had a placeholder
+      if (!name)
+        state.currentPage.name = getPageHeading() || state.currentPage.name;
+    };
+    setTimeout(snap, 900);
   }
 
   function finalisePage() {
     if (!state.currentPage) return;
     state.currentPage.endTime = Date.now();
-    state.currentPage.duration_ms = state.currentPage.endTime - state.currentPage.startTime;
+    state.currentPage.duration_ms =
+      state.currentPage.endTime - state.currentPage.startTime;
     // Final snapshot if not taken yet
     if (!state.currentPage.domSnapshot) {
-      state.currentPage.domSnapshot    = captureDOMSnapshot();
+      state.currentPage.domSnapshot = captureDOMSnapshot();
       state.currentPage.storageSnapshot = captureStorage();
     }
     state.pages.push(state.currentPage);
@@ -66,11 +104,20 @@
   function getPageHeading() {
     // Try common patterns: <h1>, page title elements, breadcrumbs, panel headers
     const selectors = [
-      "h1", "h2.page-title", ".page-header h1", ".panel-title",
-      ".content-header h1", "#pageTitle", ".breadcrumb li:last-child",
-      ".card-title", "[class*='title'] h1", "[class*='heading']",
+      "h1",
+      "h2.page-title",
+      ".page-header h1",
+      ".panel-title",
+      ".content-header h1",
+      "#pageTitle",
+      ".breadcrumb li:last-child",
+      ".card-title",
+      "[class*='title'] h1",
+      "[class*='heading']",
       // VTOP-specific
-      ".studentLabel", ".tt-head", "td.menu_title"
+      ".studentLabel",
+      ".tt-head",
+      "td.menu_title",
     ];
     for (const sel of selectors) {
       const el = document.querySelector(sel);
@@ -85,12 +132,17 @@
   // ── Content hash — detects structural DOM changes ────────────────────────
   function getContentHash() {
     // Hash based on: tag names + ids + text of first 30 visible elements in main content
-    const main = document.querySelector(
-      "main, #main, .main-content, #content, .content, #pageContent, body"
-    ) || document.body;
-    const els = [...main.querySelectorAll("h1,h2,h3,table,form,.panel,.card,section")]
+    const main =
+      document.querySelector(
+        "main, #main, .main-content, #content, .content, #pageContent, body",
+      ) || document.body;
+    const els = [
+      ...main.querySelectorAll("h1,h2,h3,table,form,.panel,.card,section"),
+    ]
       .slice(0, 30)
-      .map(el => `${el.tagName}|${el.id}|${(el.innerText||"").slice(0,40)}`)
+      .map(
+        (el) => `${el.tagName}|${el.id}|${(el.innerText || "").slice(0, 40)}`,
+      )
       .join(";");
     return els;
   }
@@ -101,8 +153,8 @@
     // Measure how much changed (rough %)
     const prev = state.lastContentHash.split(";");
     const curr = hash.split(";");
-    const same = curr.filter(c => prev.includes(c)).length;
-    const changeRatio = 1 - (same / Math.max(prev.length, curr.length, 1));
+    const same = curr.filter((c) => prev.includes(c)).length;
+    const changeRatio = 1 - same / Math.max(prev.length, curr.length, 1);
     return changeRatio > 0.4; // >40% of elements changed = new page
   }
 
@@ -112,7 +164,8 @@
     let significantChanges = 0;
     for (const m of mutations) {
       for (const node of m.addedNodes) {
-        if (node.nodeType === 1) { // Element node
+        if (node.nodeType === 1) {
+          // Element node
           const size = (node.innerHTML || "").length;
           if (size > 200) significantChanges++;
         }
@@ -126,6 +179,7 @@
       const contentChanged = contentChangedSignificantly();
 
       if (headingChanged || contentChanged) {
+        if (loaderVisible()) return; // don't record a spinner as a page
         notifyBackground("mutation", getPageHeading());
         startPage("dom-mutation");
       }
@@ -133,9 +187,9 @@
   });
 
   observer.observe(document.body, {
-    childList:  true,
-    subtree:    true,
-    attributes: false
+    childList: true,
+    subtree: true,
+    attributes: false,
   });
 
   // ── Network burst detector — intercept XHR & fetch ───────────────────────
@@ -166,6 +220,10 @@
       if (state.pendingBurstReqs >= 3) {
         // Only trigger if DOM also changed
         if (contentChangedSignificantly()) {
+          if (loaderVisible()) {
+            state.pendingBurstReqs = 0;
+            return;
+          }
           notifyBackground("network-burst", getPageHeading());
           startPage("network-burst");
         }
@@ -175,7 +233,7 @@
   }
 
   // ── History API intercept (handles hash changes + pushState) ────────────
-  const origPush    = history.pushState.bind(history);
+  const origPush = history.pushState.bind(history);
   const origReplace = history.replaceState.bind(history);
   history.pushState = function (...a) {
     origPush(...a);
@@ -198,6 +256,17 @@
   // ── DOM Snapshot ─────────────────────────────────────────────────────────
   function captureDOMSnapshot() {
     try {
+      // Stamp rendered media sizes so remaker placeholders keep their box.
+      document
+        .querySelectorAll("img,video,iframe,canvas,embed,object")
+        .forEach((el) => {
+          try {
+            const r = el.getBoundingClientRect();
+            if (r.width) el.setAttribute("data-harvest-w", Math.round(r.width));
+            if (r.height)
+              el.setAttribute("data-harvest-h", Math.round(r.height));
+          } catch (e) {}
+        });
       const html = document.documentElement.outerHTML;
       const styles = [];
       for (const sheet of document.styleSheets) {
@@ -205,38 +274,54 @@
           const rules = [];
           for (const rule of sheet.cssRules) rules.push(rule.cssText);
           styles.push({ href: sheet.href, rules, inline: !sheet.href });
-        } catch (e) { styles.push({ href: sheet.href, error: "CORS" }); }
+        } catch (e) {
+          styles.push({ href: sheet.href, error: "CORS" });
+        }
       }
       const forms = [];
       for (const form of document.forms) {
         const fields = [];
         for (const el of form.elements) {
           fields.push({
-            tag: el.tagName, type: el.type || null,
-            name: el.name || null, id: el.id || null,
-            value: el.type === "password" ? "[REDACTED]" : (el.value || null),
-            options: el.tagName === "SELECT"
-              ? [...el.options].map(o => ({ value: o.value, text: o.text }))
-              : null,
+            tag: el.tagName,
+            type: el.type || null,
+            name: el.name || null,
+            id: el.id || null,
+            value: el.type === "password" ? "[REDACTED]" : el.value || null,
+            options:
+              el.tagName === "SELECT"
+                ? [...el.options].map((o) => ({ value: o.value, text: o.text }))
+                : null,
             required: el.required || false,
-            placeholder: el.placeholder || null
+            placeholder: el.placeholder || null,
           });
         }
-        forms.push({ id: form.id, name: form.name, action: form.action, method: form.method, fields });
+        forms.push({
+          id: form.id,
+          name: form.name,
+          action: form.action,
+          method: form.method,
+          fields,
+        });
       }
       const buttons = [];
       for (const btn of document.querySelectorAll(
-        "button, input[type=submit], input[type=button], [role=button], a[href], select, .menu-item, [onclick]"
+        "button, input[type=submit], input[type=button], [role=button], a[href], select, .menu-item, [onclick]",
       )) {
         buttons.push({
-          tag: btn.tagName, id: btn.id || null,
+          tag: btn.tagName,
+          id: btn.id || null,
           classes: btn.className?.slice?.(0, 80) || null,
           text: btn.innerText?.trim().slice(0, 100) || null,
-          href: btn.href || null, type: btn.type || null,
+          href: btn.href || null,
+          type: btn.type || null,
           selector: btn.id
             ? "#" + btn.id
-            : btn.tagName.toLowerCase() + (btn.className ? "." + btn.className.trim().split(/\s+/).slice(0,3).join(".") : ""),
-          onclick: btn.getAttribute("onclick")?.slice(0, 200) || null
+            : btn.tagName.toLowerCase() +
+              (btn.className
+                ? "." + btn.className.trim().split(/\s+/).slice(0, 3).join(".")
+                : ""),
+          onclick: btn.getAttribute("onclick")?.slice(0, 200) || null,
         });
       }
       const meta = {};
@@ -244,59 +329,104 @@
         const k = m.name || m.property || m.httpEquiv;
         if (k) meta[k] = m.content;
       }
-      return { html, styles, forms, buttons, meta, title: document.title, capturedAt: Date.now() };
+      return {
+        html,
+        styles,
+        forms,
+        buttons,
+        meta,
+        title: document.title,
+        capturedAt: Date.now(),
+      };
     } catch (e) {
       return { error: e.message };
     }
   }
 
   function captureStorage() {
-    const ls = {}, ss = {};
-    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); ls[k] = localStorage.getItem(k); } } catch(e){}
-    try { for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); ss[k] = sessionStorage.getItem(k); } } catch(e){}
+    const ls = {},
+      ss = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        ls[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        ss[k] = sessionStorage.getItem(k);
+      }
+    } catch (e) {}
     return { localStorage: ls, sessionStorage: ss };
   }
 
   // ── Interaction tracking ──────────────────────────────────────────────────
-  document.addEventListener("click", (e) => {
-    const el = e.target;
-    const entry = {
-      time: Date.now(), type: "click",
-      selector: getSelector(el), tag: el.tagName,
-      id: el.id || null, text: el.innerText?.trim().slice(0, 150) || null,
-      href: el.href || null,
-      x: e.clientX, y: e.clientY
-    };
-    if (state.currentPage) state.currentPage.interactionLog.push(entry);
-  }, true);
+  document.addEventListener(
+    "click",
+    (e) => {
+      const el = e.target;
+      const entry = {
+        time: Date.now(),
+        type: "click",
+        selector: getSelector(el),
+        tag: el.tagName,
+        id: el.id || null,
+        text: el.innerText?.trim().slice(0, 150) || null,
+        href: el.href || null,
+        x: e.clientX,
+        y: e.clientY,
+      };
+      if (state.currentPage) state.currentPage.interactionLog.push(entry);
+    },
+    true,
+  );
 
-  document.addEventListener("submit", (e) => {
-    const form = e.target;
-    const fields = {};
-    for (const el of form.elements) {
-      if (el.name) fields[el.name] = el.type === "password" ? "[REDACTED]" : el.value;
-    }
-    if (state.currentPage) state.currentPage.interactionLog.push({
-      time: Date.now(), type: "form_submit",
-      selector: getSelector(form), action: form.action,
-      method: form.method, fields
-    });
-  }, true);
+  document.addEventListener(
+    "submit",
+    (e) => {
+      const form = e.target;
+      const fields = {};
+      for (const el of form.elements) {
+        if (el.name)
+          fields[el.name] = el.type === "password" ? "[REDACTED]" : el.value;
+      }
+      if (state.currentPage)
+        state.currentPage.interactionLog.push({
+          time: Date.now(),
+          type: "form_submit",
+          selector: getSelector(form),
+          action: form.action,
+          method: form.method,
+          fields,
+        });
+    },
+    true,
+  );
 
-  document.addEventListener("change", (e) => {
-    const el = e.target;
-    if (!["INPUT","SELECT","TEXTAREA"].includes(el.tagName)) return;
-    if (state.currentPage) state.currentPage.interactionLog.push({
-      time: Date.now(), type: "input_change",
-      selector: getSelector(el), name: el.name || null,
-      value: el.type === "password" ? "[REDACTED]" : el.value
-    });
-  }, true);
+  document.addEventListener(
+    "change",
+    (e) => {
+      const el = e.target;
+      if (!["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
+      if (state.currentPage)
+        state.currentPage.interactionLog.push({
+          time: Date.now(),
+          type: "input_change",
+          selector: getSelector(el),
+          name: el.name || null,
+          value: el.type === "password" ? "[REDACTED]" : el.value,
+        });
+    },
+    true,
+  );
 
   // ── Manual checkpoint (keyboard shortcut: Alt+Shift+P) ───────────────────
   document.addEventListener("keydown", (e) => {
     if (e.altKey && e.shiftKey && e.key === "P") {
-      const name = prompt("📸 Mark new page — enter a name (or leave blank for auto-detect):");
+      const name = prompt(
+        "📸 Mark new page — enter a name (or leave blank for auto-detect):",
+      );
       if (name === null) return; // cancelled
       notifyBackground("manual-checkpoint", name || getPageHeading());
       startPage("manual", name || null);
@@ -309,13 +439,24 @@
     const el = document.createElement("div");
     el.textContent = msg;
     Object.assign(el.style, {
-      position: "fixed", bottom: "20px", right: "20px", zIndex: "999999",
-      background: "#7c3aed", color: "white", padding: "10px 18px",
-      borderRadius: "8px", fontFamily: "monospace", fontSize: "13px",
-      boxShadow: "0 4px 20px rgba(0,0,0,.3)", transition: "opacity .3s"
+      position: "fixed",
+      bottom: "20px",
+      right: "20px",
+      zIndex: "999999",
+      background: "#7c3aed",
+      color: "white",
+      padding: "10px 18px",
+      borderRadius: "8px",
+      fontFamily: "monospace",
+      fontSize: "13px",
+      boxShadow: "0 4px 20px rgba(0,0,0,.3)",
+      transition: "opacity .3s",
     });
     document.body.appendChild(el);
-    setTimeout(() => { el.style.opacity = "0"; setTimeout(() => el.remove(), 400); }, 3000);
+    setTimeout(() => {
+      el.style.opacity = "0";
+      setTimeout(() => el.remove(), 400);
+    }, 3000);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -326,8 +467,11 @@
     let cur = el;
     while (cur && cur.nodeType === 1 && cur !== document.body) {
       let part = cur.tagName.toLowerCase();
-      if (cur.id) { parts.unshift("#" + cur.id); break; }
-      if (cur.className) part += "." + [...cur.classList].slice(0,2).join(".");
+      if (cur.id) {
+        parts.unshift("#" + cur.id);
+        break;
+      }
+      if (cur.className) part += "." + [...cur.classList].slice(0, 2).join(".");
       parts.unshift(part);
       cur = cur.parentElement;
     }
@@ -335,13 +479,22 @@
   }
 
   function slugify(text) {
-    return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 50);
   }
 
   function notifyBackground(reason, name) {
     try {
-      chrome.runtime.sendMessage({ type: "SPA_PAGE_CHANGE", reason, name, url: location.href });
-    } catch(e) {}
+      chrome.runtime.sendMessage({
+        type: "SPA_PAGE_CHANGE",
+        reason,
+        name,
+        url: location.href,
+      });
+    } catch (e) {}
   }
 
   // ── Message handler ───────────────────────────────────────────────────────
@@ -350,8 +503,8 @@
       finalisePage(); // seal the current page before export
       sendResponse({
         virtualPages: [...state.pages],
-        currentPage:  state.currentPage,
-        storageSnapshot: captureStorage()
+        currentPage: state.currentPage,
+        storageSnapshot: captureStorage(),
       });
       return true;
     }
@@ -364,7 +517,7 @@
     if (msg.type === "GET_VIRTUAL_PAGE_COUNT") {
       sendResponse({
         count: state.pages.length + (state.currentPage ? 1 : 0),
-        currentName: state.currentPage?.name || null
+        currentName: state.currentPage?.name || null,
       });
       return true;
     }
@@ -372,5 +525,4 @@
 
   // ── Init: start the first virtual page ───────────────────────────────────
   startPage("initial-load");
-
 })();
