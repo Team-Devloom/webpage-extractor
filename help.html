@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Page Harvester - Guide</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+      :root {
+        --bg: #0a0a0f;
+        --surface: #111118;
+        --border: #2a2a3a;
+        --accent: #7c3aed;
+        --accent2: #a855f7;
+        --text: #e2e8f0;
+        --muted: #6b7280;
+        --green: #22c55e;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Space Grotesk", sans-serif;
+        line-height: 1.7;
+      }
+      .container {
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 40px 24px;
+      }
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      h1 span {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .subtitle {
+        color: var(--muted);
+        margin-bottom: 40px;
+      }
+      h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 32px 0 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      p {
+        color: #94a3b8;
+        margin-bottom: 12px;
+      }
+      .step {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .step-num {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .step-content strong {
+        display: block;
+        color: var(--text);
+        margin-bottom: 2px;
+      }
+      .step-content {
+        color: #94a3b8;
+        font-size: 14px;
+      }
+      .tree {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px 20px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 2;
+        color: #94a3b8;
+      }
+      .tree .folder {
+        color: var(--accent2);
+        font-weight: 700;
+      }
+      .tree .file {
+        color: var(--text);
+      }
+      .tree .comment {
+        color: var(--muted);
+      }
+      .files {
+        display: grid;
+        gap: 10px;
+        margin: 16px 0;
+      }
+      .file-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+      }
+      .file-name {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--accent2);
+        margin-bottom: 4px;
+      }
+      .file-desc {
+        font-size: 13px;
+        color: #94a3b8;
+      }
+      .warn {
+        background: rgba(234, 179, 8, 0.08);
+        border: 1px solid rgba(234, 179, 8, 0.2);
+        border-radius: 6px;
+        padding: 12px 16px;
+        color: #ca8a04;
+        font-size: 13px;
+        margin: 16px 0;
+      }
+      code {
+        font-family: "JetBrains Mono", monospace;
+        background: var(--surface);
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+        color: var(--accent2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🌾 <span>Page Harvester v2</span></h1>
+      <p class="subtitle">
+        Multi-page deep capture - HTML, network, timing, clicks, storage across
+        an entire site session
+      </p>
+
+      <h2>How to Use</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <strong>Log into the target site</strong>Be authenticated before
+          recording so cookies and auth headers are captured.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <strong>Click 🌾 → Start Recording</strong>Badge goes red (REC). The
+          debugger attaches and stays attached across page navigations.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <strong>Navigate the site normally</strong>Click every button, visit
+          every section. Each page you navigate to is captured as a separate
+          snapshot - including load time, all network calls, and UI state.
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <strong>Stop & Export</strong>A full folder is downloaded - one file
+          per page plus global index files.
+        </div>
+      </div>
+
+      <h2>Output Folder Structure</h2>
+      <div class="tree">
+        <span class="folder">harvest_college_edu_2026-06-08/</span>
+        ├── <span class="file">index.json</span>
+        <span class="comment"
+          >← session manifest, navigation flow, folder map</span
+        >
+        ├── <span class="file">navigation_flow.json</span>
+        <span class="comment">← page-by-page journey with load times</span> ├──
+        <span class="file">api_catalogue.json</span>
+        <span class="comment"
+          >← every API endpoint across all pages, deduplicated</span
+        >
+        ├── <span class="file">cookies.json</span>
+        <span class="comment"
+          >← all cookies with flags (httpOnly, sameSite, etc)</span
+        >
+        ├── <span class="file">bot_guide.json</span>
+        <span class="comment"
+          >← LLM-ready automation guide (feed this to Claude)</span
+        >
+        └── <span class="folder">pages/</span> ├──
+        <span class="folder">page_001_college_edu_login/</span> │ ├──
+        <span class="file">snapshot.html</span>
+        <span class="comment">← full DOM with inline styles</span> │ ├──
+        <span class="file">network.json</span>
+        <span class="comment">← all requests + full timing breakdown</span> │
+        ├── <span class="file">dom.json</span>
+        <span class="comment">← forms, buttons, stylesheets, meta tags</span> │
+        └── <span class="file">interactions.json</span>
+        <span class="comment">← click log, localStorage, sessionStorage</span>
+        ├── <span class="folder">page_002_college_edu_registration/</span> │ └──
+        <span class="comment">... same 4 files ...</span> └──
+        <span class="folder">page_003_college_edu_courses/</span> └──
+        <span class="comment">... same 4 files ...</span>
+      </div>
+
+      <h2>Key File Details</h2>
+      <div class="files">
+        <div class="file-card">
+          <div class="file-name">bot_guide.json</div>
+          <div class="file-desc">
+            Paste this directly into Claude. Contains: all API endpoints with
+            sample request/response, auth headers identified, form field names,
+            timing recommendations (e.g. "wait 743ms between calls"), cookies
+            required.
+          </div>
+        </div>
+        <div class="file-card">
+          <div class="file-name">pages/pageNNN/network.json</div>
+          <div class="file-desc">
+            Every network request for that page: URL, method, headers, POST
+            body, response body (for XHR/Fetch), and precise per-phase timing —
+            DNS lookup, TCP connect, TLS handshake, server wait (TTFB),
+            download. This is what powers exact latency simulation.
+          </div>
+        </div>
+        <div class="file-card">
+          <div class="file-name">pages/pageNNN/snapshot.html</div>
+          <div class="file-desc">
+            Full live DOM snapshot. Open in any browser for visual reference.
+            Contains inline styles for offline viewing.
+          </div>
+        </div>
+        <div class="file-card">
+          <div class="file-name">navigation_flow.json</div>
+          <div class="file-desc">
+            The exact journey: URL → URL → URL with timestamps and per-page load
+            durations. Essential for simulating the real site's pacing.
+          </div>
+        </div>
+      </div>
+
+      <h2>Building a Bot from the Capture</h2>
+      <p>Paste <code>bot_guide.json</code> into Claude with something like:</p>
+      <p
+        style="
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 12px 16px;
+          font-family: &quot;JetBrains Mono&quot;, monospace;
+          font-size: 12px;
+          color: #94a3b8;
+          margin: 8px 0;
+        "
+      >
+        "Here is a full capture of my college's course registration portal.
+        Write a Python Playwright script that: logs in, navigates to
+        registration, registers for CS101 and MATH201, and submits. Use the
+        exact endpoint URLs, headers, cookies, and POST bodies from this
+        capture. Add realistic delays based on the timing data."
+      </p>
+
+      <h2>Tips</h2>
+      <p>
+        Start recording <b>before</b> the first page loads to capture initial
+        document requests.
+      </p>
+      <p>
+        Don't open Chrome DevTools while recording - it detaches the CDP
+        debugger. Close DevTools first.
+      </p>
+      <p>
+        For SPAs, pause a few seconds on each "view" so the DOM snapshot
+        captures the right state.
+      </p>
+      <p>
+        The recreation UI (coming soon) will take this entire folder and spin up
+        a local mock server that replays all API responses with correct timing.
+      </p>
+
+      <div class="warn">
+        ⚠️ The exported files contain session cookies and auth tokens. Treat
+        them as sensitive - don't share or commit to git.
+      </div>
+    </div>
+  </body>
+</html>
